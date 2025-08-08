@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Play Nine Scorekeeper</title>
+  <style>
+    :root {
+      --green: #2e8b57;
+      --sandy-yellow: #f4e1b1;
+      --text-dark: #2c2c2c;
+      --border-radius: 10px;
+      --transition-duration: 0.4s;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: var(--sandy-yellow);
+      color: var(--text-dark);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #app {
+      width: 95%;
+      max-width: 700px;
+      position: relative;
+    }
+
+    .screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      opacity: 1;
+      transition: opacity var(--transition-duration) ease, transform var(--transition-duration) ease;
+    }
+
+    .hidden {
+      opacity: 0;
+      pointer-events: none;
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      transform: scale(0.9);
+    }
+
+    h1, h2 {
+      color: var(--green);
+      margin: 0.4em 0 0.6em 0;
+      user-select: none;
+    }
+
+    button {
+      background: var(--green);
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      margin: 10px 8px;
+      border-radius: var(--border-radius);
+      font-size: 1rem;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 4px 8px rgb(46 139 87 / 0.35);
+      transition: background 0.3s ease, transform 0.2s ease;
+    }
+
+    button:hover {
+      background: #276749;
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    input[type="number"],
+    input.player-name {
+      padding: 8px;
+      font-size: 1rem;
+      border-radius: var(--border-radius);
+      border: 1.5px solid #ccc;
+      transition: border-color 0.3s ease;
+    }
+
+    input[type="number"] {
+      width: 70px;
+      text-align: center;
+    }
+
+    input.player-name {
+      width: 180px;
+      margin: 6px 0;
+      text-align: center;
+    }
+
+    input.score-input {
+      width: 80px;
+    }
+
+    input.score-input.animate {
+      animation: highlightInput 0.5s ease forwards;
+      border-color: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+
+    @keyframes highlightInput {
+      0% {
+        border-color: var(--green);
+        box-shadow: 0 0 8px var(--green);
+      }
+      100% {
+        border-color: #ccc;
+        box-shadow: none;
+      }
+    }
+
+    .score-input-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin: 6px 0;
+    }
+
+    .score-input-row label {
+      flex: 1;
+      user-select: none;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    .controls, .save-load {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+
+    #winner-screen {
+      animation: winnerScreenZoom 0.7s ease forwards;
+      text-align: center;
+      position: relative;
+      z-index: 10;
+      user-select: none;
+    }
+
+    @keyframes winnerScreenZoom {
+      0% {
+        opacity: 0;
+        transform: scale(0.8);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    #confetti {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .round-display {
+      margin: 12px 0 16px;
+      font-size: 1.3rem;
+      font-weight: bold;
+      user-select: none;
+    }
+
+    .totals {
+      margin-top: 20px;
+      font-size: 1.1rem;
+      color: #333;
+      user-select: none;
+    }
+
+    #player-names-container {
+      margin-top: 10px;
+      margin-bottom: 10px;
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="setup-screen" class="screen">
+      <h1>Play Nine</h1>
+      <label for="player-count">Number of Players (2-6):</label>
+      <input id="player-count" type="number" min="2" max="6" value="2" oninput="renderNameInputs()" />
+      
+      <div id="player-names-container"></div>
+
+      <button onclick="startGame()">Start Game</button>
+    </div>
+
+    <div id="game-screen" class="screen hidden">
+      <div class="round-display">Round <span id="round-number">1</span> of 9</div>
+      <div id="round-inputs"></div>
+
+      <div class="controls">
+        <button onclick="prevRound()">◀ Prev</button>
+        <button onclick="nextRound()">Next ▶</button>
+        <button onclick="finishGame()" title="Finish the game early">🏁 Finish Game</button>
+      </div>
+
+      <div class="totals" id="totals"></div>
+
+      <div class="save-load">
+        <button onclick="saveGame()">💾 Save</button>
+        <button onclick="loadGame()">📂 Load</button>
+      </div>
+    </div>
+
+    <div id="winner-screen" class="screen hidden">
+      <h2>🏆 Winner!</h2>
+      <p id="winner-name"></p>
+      <canvas id="confetti"></canvas>
+      <button onclick="resetGame()">Play Again</button>
+    </div>
+  </div>
+
+  <script>
+    const maxRounds = 9;
+    let currentRound = 1;
+    let playerCount = 2;
+    let players = [];
+
+    // Player name inputs rendering
+    function renderNameInputs() {
+      const count = Math.min(6, Math.max(2, parseInt(document.getElementById('player-count').value)));
+      const container = document.getElementById('player-names-container');
+      container.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = `Player ${i + 1} Name`;
+        input.className = 'player-name';
+        input.id = `player-name-${i}`;
+        input.value = `Player ${i + 1}`;
+        container.appendChild(input);
+      }
+    }
+    renderNameInputs();
+
+    function startGame() {
+      playerCount = Math.min(6, Math.max(2, parseInt(document.getElementById('player-count').value)));
+      players = [];
+      for (let i = 0; i < playerCount; i++) {
+        const nameInput = document.getElementById(`player-name-${i}`);
+        const name = nameInput && nameInput.value.trim() !== '' ? nameInput.value.trim() : `Player ${i + 1}`;
+        players.push({
+          name,
+          scores: Array(maxRounds).fill('')
+        });
+      }
+      currentRound = 1;
+      transitionScreens('setup-screen', 'game-screen');
+      renderRound();
+    }
+
+    function renderRound() {
+      document.getElementById('round-number').innerText = currentRound;
+      const container = document.getElementById('round-inputs');
+      container.innerHTML = '';
+
+      players.forEach((player, i) => {
+        const row = document.createElement('div');
+        row.className = 'score-input-row';
+        row.innerHTML = `
+          <label for="score-input-${i}">${player.name}</label>
+          <input 
+            id="score-input-${i}"
+            class="score-input"
+            type="number" min="0" 
+            value="${player.scores[currentRound - 1] || ''}" 
+            onchange="updateScore(${i}, this)">
+        `;
+        container.appendChild(row);
+      });
+
+      renderTotals();
+    }
+
+    function updateScore(playerIndex, inputElement) {
+      // Animate input
+      inputElement.classList.remove('animate');
+      void inputElement.offsetWidth; // Trigger reflow for restart animation
+      inputElement.classList.add('animate');
+
+      players[playerIndex].scores[currentRound - 1] = parseInt(inputElement.value) || '';
+      if (isGameOver()) {
+        finishGame();
+      } else {
+        renderTotals();
+      }
+    }
+
+    function renderTotals() {
+      const totalsDiv = document.getElementById('totals');
+      const totals = players.map(p => p.scores.reduce((a, b) => a + (parseInt(b) || 0), 0));
+      totalsDiv.innerHTML = players.map((p, i) =>
+        `${p.name}: <strong>${totals[i]}</strong> pts`).join('<br>');
+    }
+
+    function nextRound() {
+      if (currentRound < maxRounds) {
+        currentRound++;
+        renderRound();
+      }
+    }
+
+    function prevRound() {
+      if (currentRound > 1) {
+        currentRound--;
+        renderRound();
+      }
+    }
+
+    function isGameOver() {
+      return players.every(p => p.scores.every(s => s !== ''));
+    }
+
+    function finishGame() {
+      // Only show winner screen if at least one score entered
+      if (players.every(p => p.scores.every(s => s === ''))) {
+        alert("No scores entered yet!");
+        return;
+      }
+      const totals = players.map(p => p.scores.reduce((a, b) => a + (parseInt(b) || 0), 0));
+      const minScore = Math.min(...totals);
+      const winnerIndex = totals.indexOf(minScore);
+      transitionScreens('game-screen', 'winner-screen');
+      document.getElementById('winner-name').innerText = `${players[winnerIndex].name} wins with ${minScore} points!`;
+      startConfetti();
+    }
+
+    function saveGame() {
+      const saveData = { players, currentRound };
+      localStorage.setItem('playNineSave', JSON.stringify(saveData));
+      alert('Game saved!');
+    }
+
+    function loadGame() {
+      const data = localStorage.getItem('playNineSave');
+      if (data) {
+        const parsed = JSON.parse(data);
+        players = parsed.players;
+        currentRound = parsed.currentRound;
+        transitionScreens('setup-screen', 'game-screen');
+        renderRound();
+      } else {
+        alert('No saved game found.');
+      }
+    }
+
+    function resetGame() {
+      transitionScreens('winner-screen', 'setup-screen');
+      stopConfetti();
+    }
+
+    // Screen transition helper for fade/scale animation
+    function transitionScreens(fromId, toId) {
+      const fromScreen = document.getElementById(fromId);
+      const toScreen = document.getElementById(toId);
+      fromScreen.classList.add('hidden');
+      setTimeout(() => {
+        toScreen.classList.remove('hidden');
+      }, 300);
+    }
+
+    // Confetti animation
+    let confettiCtx, confettiParticles = [], confettiRunning = false;
+    function startConfetti() {
+      if (confettiRunning) return;
+      confettiRunning = true;
+      const canvas = document.getElementById('confetti');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      confettiCtx = canvas.getContext('2d');
+      confettiParticles = Array.from({ length: 150 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height - canvas.height,
+        size: Math.random() * 6 + 4,
+        speed: Math.random() * 3 + 2,
+        color: `hsl(${Math.random() * 360}, 100%, 70%)`,
+        tilt: Math.random() * 10 - 10,
+        tiltAngle: 0,
+        tiltAngleSpeed: Math.random() * 0.1 + 0.05
+      }));
+      requestAnimationFrame(confettiLoop);
+    }
+
+    function confettiLoop() {
+      if (!confettiRunning) return;
+      const canvas = document.getElementById('confetti');
+      confettiCtx.clearRect(0, 0, canvas.width, canvas.height);
+      confettiParticles.forEach(p => {
+        p.y += p.speed;
+        p.tiltAngle += p.tiltAngleSpeed;
+        p.tilt = Math.sin(p.tiltAngle) * 15;
+
+        if (p.y > canvas.height) {
+          p.x = Math.random() * canvas.width;
+          p.y = -10;
+          p.tilt = Math.random() * 10 - 10;
+        }
+
+        confettiCtx.fillStyle = p.color;
+        confettiCtx.beginPath();
+        confettiCtx.moveTo(p.x + p.tilt + p.size / 2, p.y);
+        confettiCtx.lineTo(p.x + p.tilt, p.y + p.size);
+        confettiCtx.lineTo(p.x + p.tilt - p.size / 2, p.y);
+        confettiCtx.lineTo(p.x + p.tilt, p.y - p.size);
+        confettiCtx.closePath();
+        confettiCtx.fill();
+      });
+      requestAnimationFrame(confettiLoop);
+    }
+
+    function stopConfetti() {
+      confettiRunning = false;
+      const canvas = document.getElementById('confetti');
+      if (confettiCtx) confettiCtx.clearRect(0, 0, canvas.width, canvas.height);
+      confettiParticles = [];
+    }
+  </script>
+</body>
+</html>
